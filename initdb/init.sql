@@ -1,0 +1,2 @@
+CREATE USER admin_user WITH PASSWORD 'admin';
+ALTER USER admin_user WITH SUPERUSER;

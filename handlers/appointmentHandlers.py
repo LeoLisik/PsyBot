@@ -8,15 +8,19 @@ from DB.DBhandlers import *
 
 router = Router()
 
+
 class DateCallbackFactory(CallbackData, prefix="date="):
     date: str
+
 
 class PsychologistCallbackFactory(CallbackData, prefix="psychologist="):
     id_psychologist: int
 
+
 class SlotCallbackFactory(CallbackData, prefix="slot="):
     id_slot: int
     date: str
+
 
 @router.callback_query(F.data == "tochoice")
 async def handle_choice(callback: CallbackQuery):
@@ -30,6 +34,7 @@ async def handle_choice(callback: CallbackQuery):
 
     await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
+
 
 @router.callback_query(F.data == "bysurname")
 async def handle_surname(callback: CallbackQuery):
@@ -47,6 +52,7 @@ async def handle_surname(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
 
+
 @router.callback_query(PsychologistCallbackFactory.filter())
 async def handle_time(callback: CallbackQuery, callback_data: PsychologistCallbackFactory):
     builder = InlineKeyboardBuilder()
@@ -54,16 +60,21 @@ async def handle_time(callback: CallbackQuery, callback_data: PsychologistCallba
     times = await get_free_slots_for_psychologist(callback_data.id_psychologist)
 
     if len(times) == 0:
-        await callback.message.edit_text("Похоже у этого психолога заняты все записи, на ближайшие 2 недели\n\nПопробуй завтра, возможно появятся новые записи")
+        await callback.message.edit_text(
+            "Похоже у этого психолога заняты все записи, на ближайшие 2 недели\n\nПопробуй завтра, возможно появятся "
+            "новые записи")
 
     for id, date, time, weekday in times:
-        builder.button(text=f"{weekday} {datetime.time.fromisoformat(time).strftime("%H:%M")} ({datetime.date.fromisoformat(date).strftime("%d.%m")})", callback_data=SlotCallbackFactory(id_slot=id, date=date))
+        builder.button(
+            text=f"{weekday} {time.strftime('%H:%M')} ({datetime.date.fromisoformat(date).strftime('%d.%m')})",
+            callback_data=SlotCallbackFactory(id_slot=id, date=date))
 
     builder.button(text="Назад", callback_data="bysurname")
     builder.adjust(2)
 
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
     await callback.answer()
+
 
 @router.callback_query(F.data == "bydays")
 async def handle_days(callback: CallbackQuery):
@@ -72,13 +83,14 @@ async def handle_days(callback: CallbackQuery):
     dates = await get_slot_dates()
 
     for name, date in dates:
-        builder.button(text=f"{name} ({date.strftime("%d.%m")})", callback_data=DateCallbackFactory(date=str(date)))
+        builder.button(text=f"{name} ({date.strftime('%d.%m')})", callback_data=DateCallbackFactory(date=str(date)))
 
     builder.button(text="Назад", callback_data="tochoice")
     builder.adjust(2)
 
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
     await callback.answer()
+
 
 @router.callback_query(DateCallbackFactory.filter())
 async def handle_date(callback: CallbackQuery, callback_data: DateCallbackFactory):
@@ -87,7 +99,7 @@ async def handle_date(callback: CallbackQuery, callback_data: DateCallbackFactor
     options = await get_free_slots_for_date(datetime.date.fromisoformat(callback_data.date))
 
     for id, time, surname in options:
-        builder.button(text=f"{surname} ({datetime.time.fromisoformat(time).strftime("%H:%M")})",
+        builder.button(text=f"{surname} ({time.strftime('%H:%M')})",
                        callback_data=SlotCallbackFactory(id_slot=id, date=callback_data.date))
 
     builder.button(text="Назад", callback_data="bydays")
@@ -105,22 +117,30 @@ async def handle_slot(callback: CallbackQuery, callback_data: SlotCallbackFactor
         ]
     ])
     id_client = await get_client_id_by_telegram(id_telegram=callback.from_user.id)
+    client = await get_client(id_client)
     assignments = await get_user_assignments(id_client, days=13)
     if assignments:
-        await callback.message.edit_text(f"Ты уже записан:\n📅 {datetime.date.fromisoformat(assignments[0]['date']).strftime("%d.%m")}\n⌛️ {datetime.time.fromisoformat(assignments[0]['time']).strftime("%H:%M")}\n🙋‍♂️ {assignments[0]['psychologist']}\n\nТы сможешь снова записаться после этого приема",
-                                         reply_markup=keyboard)
+        await callback.message.edit_text(
+            f"Ты уже записан:\n📅 {assignments[0]['date'].strftime('%d.%m')}\n⌛️ {assignments[0]['time'].strftime('%H:%M')}\n🙋‍♂️ {assignments[0]['psychologist']}\n📞 {assignments[0]['phone']}\n\n"
+            f"Напиши психологу на WhatsApp за день до консультации не позднее 17:00 (поставь себе напоминание).\n\n"
+            f"<code>Здравствуйте, я {client.surname} {client.name} записан(а) к Вам на консультацию {assignments[0]['date'].strftime('%d.%m')} на {assignments[0]['time'].strftime('%H:%M')}. В какой кабинет мне подойти?</code>\n"
+            f"(Нажми чтобы скопировать)\n\n"
+            f"Дождись ответа, психолог может быть занят с другим клиентом. Это сообщение "
+            f"будет подтверждением твоей готовности к консультации."
+            f"Без такого сообщения консультация не состоится.\n\n"
+            f"Ты сможешь снова записаться после этого приема",
+            reply_markup=keyboard)
         await callback.answer()
         return
 
     result = await assign_user_to_slot(id_client, callback_data.id_slot, callback_data.date)
 
     if result is not None:
-        client = await get_client(id_client)
         await callback.message.edit_text(f"Ты записан(а) к \n"
-                                         f"🙋‍♂️ {result["psychologist"]}\n📅 {datetime.date.fromisoformat(result["date"]).strftime("%d.%m.%y")}\n⌛️ {datetime.time.fromisoformat(result["time"]).strftime("%H:%M")}\n\n"
-                                         f"Напиши психологу за день до консультации не позднее 17:00 (поставь себе напоминание).\n\n"
-                                         f"<code>Здравствуйте, я {client.surname} {client.name} записан(а) к Вам на консультацию {datetime.date.fromisoformat(result["date"]).strftime("%d.%m.%y")} на {datetime.time.fromisoformat(result["time"]).strftime("%H:%M")}. В какой кабинет мне подойти?</code>\n"
-                                         f"(Нажмите чтобы скопировать)\n\n"
+                                         f"🙋‍♂️ {result['psychologist']}\n📅 {datetime.date.fromisoformat(result['date']).strftime('%d.%m.%y')}\n⌛️ {result['time'].strftime('%H:%M')}\n\n"
+                                         f"Напиши психологу на WhatsApp за день до консультации не позднее 17:00 (поставь себе напоминание).\n\n"
+                                         f"<code>Здравствуйте, я {client.surname} {client.name} записан(а) к Вам на консультацию {datetime.date.fromisoformat(result['date']).strftime('%d.%m.%y')} на {result['time'].strftime('%H:%M')}. В какой кабинет мне подойти?</code>\n"
+                                         f"(Нажми чтобы скопировать)\n\n"
                                          f"Дождись ответа, психолог может быть занят с другим клиентом. Это сообщение будет подтверждением твоей готовности к консультации. "
                                          f"Без такого сообщения консультация не состоится.",
                                          reply_markup=keyboard)

@@ -1,19 +1,21 @@
+import os
 import asyncpg
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from .models import Base, Weekday, Institute
 
 #DB_URL = "sqlite+aiosqlite:///DB/database.db"
-DB_USER = "TestBot"
-DB_PASSWORD = "123"
-DB_HOST = "localhost"
-DB_PORT = 5432
-DB_NAME = "psybot"
+DB_USER = os.getenv("DB_USER", "psybot")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "123")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "psybot")
 
 DB_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_async_engine(DB_URL, echo=True)
+engine = create_async_engine(DB_URL, echo=False)
 SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
 
 async def init_db():
     # 1. Проверяем и создаём базу через asyncpg
@@ -44,6 +46,7 @@ async def init_db():
     await insert_days()
     await insert_institutes()
 
+
 async def insert_days():
     weekdays = [
         {"id": 1, "name_ru": "Пн"},
@@ -63,6 +66,7 @@ async def insert_days():
             await session.commit()
             print("Дни недели добавлены")
 
+
 async def insert_institutes():
     institutes = [
         "Колледж",
@@ -72,10 +76,10 @@ async def insert_institutes():
         "ИИТИЦТ",
         "ИСИ",
         "ИХТИПЭ",
-        "ИЭИМ"
-        "ТИТЛП"
-        "ИСК"
-        "Академия"
+        "ИЭИМ",
+        "ТИТЛП",
+        "ИСК",
+        "Академия",
         "Гимназия",
     ]
     institutes_data = [{"name": inst} for inst in institutes]

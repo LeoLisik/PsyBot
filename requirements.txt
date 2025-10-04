@@ -1,0 +1,4 @@
+asyncpg~=0.30.0
+SQLAlchemy~=2.0.43
+aiogram~=3.22.0
+aiogram-sqlalchemy_storage~=0.2.0

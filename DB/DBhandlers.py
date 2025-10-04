@@ -1,9 +1,11 @@
+import datetime
 from datetime import date, timedelta
 from sqlalchemy import select, and_, not_, exists, cast, String, result_tuple
 from sqlalchemy.exc import SQLAlchemyError
 
 from DB.DB import SessionLocal
 from DB.models import *
+
 
 def is_even_week(day: date) -> bool:
     """
@@ -26,15 +28,18 @@ def is_even_week(day: date) -> bool:
     # 0 → нечётная, 1 → чётная, 2 → снова нечётная и т.д.
     return week_diff % 2 == 1
 
+
 async def get_psychologist_surnames():
     async with SessionLocal() as session:
         result = await session.execute(select(Psychologist.id, Psychologist.surname))
         return {row[0]: row[1] for row in result.fetchall()}
 
+
 async def get_institutes():
     async with SessionLocal() as session:
         result = await session.execute(select(Institute.id, Institute.name))
         return {row[0]: row[1] for row in result.fetchall()}
+
 
 async def get_client(client_id: int) -> Client | None:
     """Получить клиента по id (возвращает ORM-объект или None)."""
@@ -47,8 +52,9 @@ async def get_client(client_id: int) -> Client | None:
             print(f"Ошибка при получении клиента: {e}")
             return None
 
+
 async def get_slot_dates():
-    today = date.today()
+    today = date.today() + timedelta(days=1)
     days = 14
 
     async with SessionLocal() as session:
@@ -65,7 +71,7 @@ async def get_slot_dates():
                 select(SlotAssignment.id)
                 .where(
                     SlotAssignment.id_slot == Slot.id,
-                    SlotAssignment.date == current_date.isoformat()  # TEXT сравнение
+                    SlotAssignment.date == current_date
                 )
                 .exists()
             )
@@ -90,6 +96,7 @@ async def get_slot_dates():
                 free_days.append((day_name, current_date))
 
         return free_days
+
 
 async def get_free_slots_for_date(target_date: date):
     even_week = is_even_week(target_date)
@@ -122,12 +129,14 @@ async def get_free_slots_for_date(target_date: date):
         result = await session.execute(q)
     return result.all()
 
-async def assign_user_to_slot(id_user: int, id_slot: int, date: str):
+
+async def assign_user_to_slot(id_user: int, id_slot: int, date_str: str):
+    day = datetime.date.fromisoformat(date_str)
     async with SessionLocal() as session:
         # Проверяем, занят ли слот
         exists_query = select(SlotAssignment).where(
             SlotAssignment.id_slot == id_slot,
-            SlotAssignment.date == date
+            SlotAssignment.date == day
         )
         result = await session.execute(exists_query)
         if result.first():
@@ -137,7 +146,7 @@ async def assign_user_to_slot(id_user: int, id_slot: int, date: str):
         new_assignment = SlotAssignment(
             id_slot=id_slot,
             id_client=id_user,
-            date=date
+            date=day
         )
         session.add(new_assignment)
         await session.commit()
@@ -153,14 +162,15 @@ async def assign_user_to_slot(id_user: int, id_slot: int, date: str):
         time, surname, name = result.first()
 
         return {
-            "date": date,
+            "date": day.isoformat(),
             "time": time,
             "psychologist": f"{surname} {name}"
         }
 
+
 async def get_free_slots_for_psychologist(id_psychologist: int):
     days = 14
-    today = date.today()
+    today = date.today() + timedelta(days=1)
     free_slots = []
 
     for i in range(days):
@@ -173,7 +183,7 @@ async def get_free_slots_for_psychologist(id_psychologist: int):
             select(SlotAssignment.id)
             .where(
                 SlotAssignment.id_slot == Slot.id,
-                SlotAssignment.date == current_date.isoformat()
+                SlotAssignment.date == current_date
             )
             .exists()
         )
@@ -202,6 +212,7 @@ async def get_free_slots_for_psychologist(id_psychologist: int):
             free_slots.append((id, str(current_date), time, weekday))
 
     return free_slots
+
 
 async def register_client(id: int, surname: str, name: str, age: int, id_institute: int) -> bool:
     async with SessionLocal() as session:
@@ -236,6 +247,7 @@ async def register_client(id: int, surname: str, name: str, age: int, id_institu
             print(f"Ошибка при регистрации клиента: {e}")
             return False
 
+
 async def get_client_id_by_telegram(id_telegram: int) -> int | None:
     """Возвращает id клиента по Telegram ID, либо None если не найден"""
     async with SessionLocal() as session:
@@ -247,6 +259,7 @@ async def get_client_id_by_telegram(id_telegram: int) -> int | None:
         except SQLAlchemyError as e:
             print(f"Ошибка при поиске клиента: {e}")
             return None
+
 
 async def get_user_assignments(id_client: int, days: int = 7):
     """Возвращает записи клиента по его ID на ближайшие days дней"""
@@ -260,15 +273,17 @@ async def get_user_assignments(id_client: int, days: int = 7):
                     SlotAssignment.date,
                     Slot.time,
                     Weekday.name_ru,
-                    Psychologist.surname,
+                    Psychologist.name,
+                    Psychologist.patronymic,
+                    Psychologist.phone
                 )
                 .join(Slot, SlotAssignment.id_slot == Slot.id)
                 .join(Weekday, Slot.id_day == Weekday.id)
                 .join(Psychologist, Slot.id_psychologist == Psychologist.id)
                 .where(
                     SlotAssignment.id_client == id_client,
-                    SlotAssignment.date >= today.isoformat(),
-                    SlotAssignment.date <= end_date.isoformat(),
+                    SlotAssignment.date >= today,
+                    SlotAssignment.date <= end_date,
                 )
                 .order_by(SlotAssignment.date, Slot.time)
             )
@@ -281,7 +296,8 @@ async def get_user_assignments(id_client: int, days: int = 7):
                     "date": row[0],
                     "time": row[1],
                     "weekday": row[2],
-                    "psychologist": row[3],
+                    "psychologist": row[3] + " " + row[4],
+                    "phone": row[5]
                 }
                 for row in assignments
             ]

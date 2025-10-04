@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: psybot_db
+    restart: always
+    environment:
+      POSTGRES_USER: psybot_db
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: psybot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  bot:
+    build: .
+    container_name: psybot_app
+    restart: always
+    depends_on:
+      - db
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DB_USER: psybot_db
+      DB_PASSWORD: 123
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: psybot
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:
