@@ -3,6 +3,7 @@ import asyncpg
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from .models import Base, Weekday, Institute
+from logger_config import logger
 
 #DB_URL = "sqlite+aiosqlite:///DB/database.db"
 DB_USER = os.getenv("DB_USER", "psybot")
@@ -27,22 +28,25 @@ async def init_db():
         database="postgres"
     )
 
+    logger.info("Соединение с базой данных установлено")
+
     exists = await pg_conn.fetchval(
         "SELECT 1 FROM pg_database WHERE datname=$1", DB_NAME
     )
 
     if not exists:
         await pg_conn.execute(f'CREATE DATABASE "{DB_NAME}"')
-        print(f"База {DB_NAME} создана")
+        logger.debug(f"База {DB_NAME} создана")
     else:
-        print(f"База {DB_NAME} уже существует")
+        logger.debug(f"База {DB_NAME} уже существует")
 
     await pg_conn.close()
 
-    # 2. Создаём таблицы через SQLAlchemy
+    logger.debug("Создание таблиц в БД")
     async with engine.begin() as sa_conn:
         await sa_conn.run_sync(Base.metadata.create_all)
 
+    logger.debug("Заполнение таблиц в БД")
     await insert_days()
     await insert_institutes()
 
@@ -59,12 +63,11 @@ async def insert_days():
     ]
 
     async with SessionLocal() as session:
-        # Проверяем, есть ли уже записи
         result = await session.execute(select(Weekday.id))
         if not result.scalars().first():
+            logger.debug("Добавление дней недели в БД")
             await session.execute(insert(Weekday), weekdays)
             await session.commit()
-            print("Дни недели добавлены")
 
 
 async def insert_institutes():
@@ -87,5 +90,6 @@ async def insert_institutes():
     async with SessionLocal() as session:
         result = await session.execute(select(Institute.id))
         if not result.scalars().first():
+            logger.debug("Добавление списка институтов в БД")
             await session.execute(insert(Institute), institutes_data)
             await session.commit()

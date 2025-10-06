@@ -46,7 +46,7 @@ class SlotAssignment(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     id_slot = Column(Integer, ForeignKey("slot.id"), nullable=False)
-    date = Column(Date, nullable=False)  # хранится как 'YYYY-MM-DD'
+    date = Column(Date, nullable=False)
     id_client = Column(Integer, ForeignKey("client.id"), nullable=False)
 
     slot = relationship("Slot", back_populates="assignments")

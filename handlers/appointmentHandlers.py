@@ -1,5 +1,5 @@
 import datetime
-
+from logger_config import logger
 from aiogram import Router, F
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -31,7 +31,7 @@ async def handle_choice(callback: CallbackQuery):
             InlineKeyboardButton(text="По фамилии", callback_data="bysurname")
         ]
     ])
-
+    logger.debug(f"{callback.from_user.id} Вызван изначальный выбор")
     await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
@@ -49,6 +49,7 @@ async def handle_surname(callback: CallbackQuery):
     builder.button(text="Назад", callback_data="tochoice")
     builder.adjust(2)
 
+    logger.debug(f"{callback.from_user.id} Вызван выбор по специалисту")
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
 
@@ -72,6 +73,7 @@ async def handle_time(callback: CallbackQuery, callback_data: PsychologistCallba
     builder.button(text="Назад", callback_data="bysurname")
     builder.adjust(2)
 
+    logger.debug(f"{callback.from_user.id} Вызвана обработка специалиста")
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
     await callback.answer()
 
@@ -88,6 +90,7 @@ async def handle_days(callback: CallbackQuery):
     builder.button(text="Назад", callback_data="tochoice")
     builder.adjust(2)
 
+    logger.debug(f"{callback.from_user.id} Вызван выбор по дням")
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
     await callback.answer()
 
@@ -105,12 +108,14 @@ async def handle_date(callback: CallbackQuery, callback_data: DateCallbackFactor
     builder.button(text="Назад", callback_data="bydays")
     builder.adjust(2)
 
+    logger.debug(f"{callback.from_user.id} Вызвана обработка дня")
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
     await callback.answer()
 
 
 @router.callback_query(SlotCallbackFactory.filter())
 async def handle_slot(callback: CallbackQuery, callback_data: SlotCallbackFactory):
+    logger.debug(f"{callback.from_user.id} Вызвана функция записи в слот")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="В начало", callback_data="tochoice"),
@@ -120,6 +125,7 @@ async def handle_slot(callback: CallbackQuery, callback_data: SlotCallbackFactor
     client = await get_client(id_client)
     assignments = await get_user_assignments(id_client, days=13)
     if assignments:
+        logger.warning(f"{callback.from_user.id} Повторная попытка записаться")
         await callback.message.edit_text(
             f"Ты уже записан:\n📅 {assignments[0]['date'].strftime('%d.%m')}\n⌛️ {assignments[0]['time'].strftime('%H:%M')}\n🙋‍♂️ {assignments[0]['psychologist']}\n📞 {assignments[0]['phone']}\n\n"
             f"Напиши психологу на WhatsApp за день до консультации не позднее 17:00 (поставь себе напоминание).\n\n"
@@ -136,6 +142,7 @@ async def handle_slot(callback: CallbackQuery, callback_data: SlotCallbackFactor
     result = await assign_user_to_slot(id_client, callback_data.id_slot, callback_data.date)
 
     if result is not None:
+        logger.info(f"Пользователь {client.id} записался на прием {result['date']} в слот {callback_data.id_slot}")
         await callback.message.edit_text(f"Ты записан(а) к \n"
                                          f"🙋‍♂️ {result['psychologist']}\n📅 {datetime.date.fromisoformat(result['date']).strftime('%d.%m.%y')}\n⌛️ {result['time'].strftime('%H:%M')}\n\n"
                                          f"Напиши психологу на WhatsApp за день до консультации не позднее 17:00 (поставь себе напоминание).\n\n"
@@ -145,5 +152,6 @@ async def handle_slot(callback: CallbackQuery, callback_data: SlotCallbackFactor
                                          f"Без такого сообщения консультация не состоится.",
                                          reply_markup=keyboard)
     else:
+        logger.warning(f"{callback.from_user.id} Неудачная попытка записаться в слот {callback_data.id_slot} на {callback_data.date}")
         await callback.message.edit_text("Кажется слот уже был занят кем-то другим", reply_markup=keyboard)
     await callback.answer()

@@ -1,5 +1,6 @@
 import asyncio
 import os
+from logger_config import logger
 
 from aiogram import Dispatcher, Bot, html
 from aiogram.client.default import DefaultBotProperties
@@ -25,13 +26,14 @@ dp.include_router(registrationHandlers.router)
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
+    logger.debug("Вызвано первое сообщение")
     if await get_client_id_by_telegram(message.from_user.id):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="Записаться", callback_data="tochoice"),
             ]
         ])
-
+        logger.debug("Обнаружен вход авторизованного пользователя")
         await message.answer(
             "Психологи нашей Психологической службы готовы принять тебя в любой будний день. Сделай свой выбор.\n\nОбрати внимание, записи открываются на 2 недели вперед",
             reply_markup=keyboard)
@@ -42,7 +44,6 @@ async def command_start_handler(message: Message) -> None:
             InlineKeyboardButton(text="Познакомиться", callback_data="register")
         ]
     ])
-
     await message.answer(
         f"Привет, это психологическая служба университета им. А.Н. Косыгина. Перед тем как записаться к психологу "
         f"давай познакомимся😉\n\nВводи пожалуйста настоящие данные, они надежно защищены и мы используем их только "
@@ -54,7 +55,7 @@ async def main() -> None:
     await init_db()
     token = str(os.getenv("BOT_TOKEN"))
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    print("Bot started")
+    logger.info("Бот запущен")
     await dp.start_polling(bot)
 
 
