@@ -15,7 +15,7 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # === Настройка логгера ===
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format=LOG_FORMAT,
     datefmt=DATE_FORMAT,
     handlers=[

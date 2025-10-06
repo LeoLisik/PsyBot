@@ -6,14 +6,18 @@ services:
     container_name: psybot_db
     restart: always
     environment:
-      POSTGRES_USER: psybot_db
-      POSTGRES_PASSWORD: 123
+      POSTGRES_USER: ${DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD}
       POSTGRES_DB: psybot
+      DB_BOT_USER: ${DB_BOT_USER}
+      DB_BOT_PASSWORD: ${DB_BOT_PASSWORD}
+      DB_APP_USER: ${DB_APP_USER}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./initdb:/docker-entrypoint-initdb.d
+      - ./DB/init-users.sh:/docker-entrypoint-initdb.d/init-users.sh:ro
     ports:
-      - "5432:5432"
+      - "${DB_EXTERNAL_PORT}:5432"
 
   bot:
     build: .
@@ -23,8 +27,8 @@ services:
       - db
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
-      DB_USER: psybot_db
-      DB_PASSWORD: 123
+      DB_USER: ${DB_BOT_USER}
+      DB_PASSWORD: ${DB_BOT_PASSWORD}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: psybot
